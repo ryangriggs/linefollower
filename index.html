@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Line Follower Simulator</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  overflow: hidden;
+  background: #111118;
+  font-family: 'Segoe UI', sans-serif;
+  user-select: none;
+}
+
+#canvas {
+  position: fixed;
+  top: 0; left: 0;
+  display: block;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────── */
+#toolbar {
+  position: fixed;
+  top: 12px; left: 12px;
+  background: rgba(18, 18, 32, 0.93);
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 100;
+  color: #bbb;
+  font-size: 12px;
+  min-width: 190px;
+  backdrop-filter: blur(6px);
+}
+
+.tb-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tb-label {
+  color: #666;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+button {
+  background: #1e1e34;
+  color: #bbb;
+  border: 1px solid #444;
+  border-radius: 5px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.12s, border-color 0.12s;
+  white-space: nowrap;
+}
+button:hover { background: #2a2a48; border-color: #666; }
+button.active {
+  background: #2e2e7a;
+  border-color: #6677ff;
+  color: #dde;
+}
+
+.slider-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  color: #888;
+}
+.slider-val { color: #aac; font-weight: bold; }
+input[type=range] {
+  width: 100%;
+  height: 4px;
+  accent-color: #6677ff;
+  cursor: pointer;
+}
+
+.tb-divider {
+  border: none;
+  border-top: 1px solid #2a2a3a;
+  margin: 2px 0;
+}
+
+/* ── Code Panel ──────────────────────────────────────────── */
+#code-panel {
+  position: fixed;
+  top: 0; right: -440px;
+  width: 440px;
+  height: 100vh;
+  background: #1e1e2e;
+  border-left: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  z-index: 200;
+  transition: right 0.22s cubic-bezier(.4,0,.2,1);
+}
+#code-panel.open { right: 0; }
+
+#cp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 14px;
+  background: #16162a;
+  border-bottom: 1px solid #333;
+  color: #ccc;
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+#cp-header button { padding: 3px 10px; font-size: 12px; }
+
+#cp-hint {
+  padding: 6px 12px;
+  background: #1a1a28;
+  border-bottom: 1px solid #2a2a3a;
+  color: #556;
+  font-size: 10px;
+  line-height: 1.5;
+  flex-shrink: 0;
+  font-family: monospace;
+}
+
+#cm-wrapper {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+#cm-wrapper .CodeMirror {
+  height: 100%;
+  font-size: 12.5px;
+  font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  line-height: 1.5;
+}
+
+#error-display {
+  background: #2a0808;
+  color: #ff8888;
+  padding: 6px 10px;
+  font-size: 11px;
+  min-height: 22px;
+  font-family: monospace;
+  border-top: 1px solid #500;
+  white-space: pre-wrap;
+  max-height: 72px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+#error-display:empty { background: #0d1a0d; border-color: #1a3a1a; }
+#error-display:empty::before {
+  content: 'No errors';
+  color: #2a5a2a;
+}
+
+/* ── Status Bar ──────────────────────────────────────────── */
+#status {
+  position: fixed;
+  bottom: 10px; left: 12px;
+  color: #444;
+  font-size: 10px;
+  font-family: monospace;
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* ── Key hint ────────────────────────────────────────────── */
+#keyhint {
+  position: fixed;
+  bottom: 10px; right: 12px;
+  color: #333;
+  font-size: 10px;
+  font-family: monospace;
+  z-index: 50;
+  pointer-events: none;
+  text-align: right;
+  line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<!-- ── Toolbar ───────────────────────────────────────────── -->
+<div id="toolbar">
+  <div class="tb-section">
+    <div class="tb-label">Mode</div>
+    <div class="btn-row">
+      <button id="btn-draw"  onclick="setMode('draw')"  title="D">✏ Draw</button>
+      <button id="btn-erase" onclick="setMode('erase')" title="E">◌ Erase</button>
+      <button id="btn-place" onclick="setMode('place')" title="P">⊕ Place</button>
+      <button id="btn-pan"   onclick="setMode('pan')"   title="Space">✥ Pan</button>
+    </div>
+  </div>
+
+  <hr class="tb-divider">
+
+  <div class="tb-section">
+    <div class="slider-row">
+      <div class="slider-header">
+        <span>Line Width</span>
+        <span class="slider-val" id="val-lw">4</span>
+      </div>
+      <input type="range" id="sld-lw" min="1" max="30" value="4"
+        oninput="lineWidth=+this.value; document.getElementById('val-lw').textContent=this.value">
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-header">
+        <span>Erase Radius</span>
+        <span class="slider-val" id="val-er">18</span>
+      </div>
+      <input type="range" id="sld-er" min="5" max="60" value="18"
+        oninput="eraseRadius=+this.value; document.getElementById('val-er').textContent=this.value">
+    </div>
+  </div>
+
+  <hr class="tb-divider">
+
+  <div class="tb-section">
+    <div class="slider-row">
+      <div class="slider-header">
+        <span>Sensor Width</span>
+        <span class="slider-val" id="val-sw">50</span>px
+      </div>
+      <input type="range" id="sld-sw" min="10" max="120" value="50"
+        oninput="sensorArrayWidth=+this.value; document.getElementById('val-sw').textContent=this.value">
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-header">
+        <span>Tick Rate</span>
+        <span class="slider-val" id="val-tr">30</span>/s
+      </div>
+      <input type="range" id="sld-tr" min="1" max="120" value="30"
+        oninput="setTickRate(+this.value); document.getElementById('val-tr').textContent=this.value">
+    </div>
+
+    <div class="slider-row">
+      <div class="slider-header">
+        <span>Speed Scale</span>
+        <span class="slider-val" id="val-ss">0.10</span>×
+      </div>
+      <input type="range" id="sld-ss" min="1" max="50" value="10"
+        oninput="speedScale=this.value/100; document.getElementById('val-ss').textContent=(this.value/100).toFixed(2)">
+    </div>
+  </div>
+
+  <hr class="tb-divider">
+
+  <div class="tb-section">
+    <button onclick="toggleCodePanel()" style="width:100%">⚙ Robot Code (C)</button>
+    <button onclick="clearAll()" style="width:100%; color:#f88">⊘ Clear All</button>
+  </div>
+</div>
+
+<!-- ── Code Panel ─────────────────────────────────────────── -->
+<div id="code-panel">
+  <div id="cp-header">
+    <span>Robot Control Code</span>
+    <button onclick="toggleCodePanel()">✕</button>
+  </div>
+  <div id="cp-hint">
+    sensor[0..6]  → boolean (left to right) &nbsp;|&nbsp; motor[0] = left &nbsp; motor[1] = right<br>
+    Speed: −255 (reverse) .. 0 (stop) .. +255 (forward) &nbsp;|&nbsp; Changes apply immediately
+  </div>
+  <div id="cm-wrapper"></div>
+  <div id="error-display"></div>
+</div>
+
+<div id="status">robots: 0 | lines: 0</div>
+<div id="keyhint">D draw · E erase · P place · Space pan · C code · RClick delete robot</div>
+
+<!-- CodeMirror -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+// Constants & robot geometry
+// ═══════════════════════════════════════════════════════════
+const BODY_W     = 44;   // along heading axis (px)
+const BODY_H     = 32;   // perpendicular to heading
+const WHEEL_LEN  = 12;   // wheel rect length (along heading)
+const WHEEL_THK  = 7;    // wheel rect thickness (perpendicular)
+const WHEEL_BASE = BODY_H + WHEEL_THK; // 39 px between wheel centres
+const SENSOR_THICK = 5;  // sensor bar depth (px)
+const SENSOR_FRONT = BODY_W / 2 + 2 + SENSOR_THICK / 2; // offset from robot centre
+
+// ═══════════════════════════════════════════════════════════
+// Mutable state
+// ═══════════════════════════════════════════════════════════
+let mode            = 'draw';
+let lineWidth       = 4;
+let eraseRadius     = 18;
+let sensorArrayWidth = 50;
+let speedScale      = 0.10;
+
+let panX = 0, panY = 0;
+
+// Each line: { points:[{x,y},...], width:number }
+let lines       = [];
+let currentLine = null;
+
+// Each robot: { x, y, angle, motor:[l,r], sensor:[7×bool] }
+let robots = [];
+
+let robotFn    = null;   // compiled user function
+let robotError = '';
+
+let isPainting = false;
+let isPanning  = false;
+let lastPanPos = { x: 0, y: 0 };
+let mouseScrPos = { x: 0, y: 0 }; // screen coords, for ghost/erase cursor
+
+// ═══════════════════════════════════════════════════════════
+// Canvas setup
+// ═══════════════════════════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ═══════════════════════════════════════════════════════════
+// Coordinate helpers  (no zoom, just pan)
+// ═══════════════════════════════════════════════════════════
+function s2w(sx, sy) { return { x: sx - panX, y: sy - panY }; }
+
+// ═══════════════════════════════════════════════════════════
+// Mode
+// ═══════════════════════════════════════════════════════════
+function setMode(m) {
+  mode = m;
+  ['draw','erase','place','pan'].forEach(id =>
+    document.getElementById('btn-' + id).classList.toggle('active', id === m)
+  );
+  canvas.style.cursor = m === 'pan' ? 'grab' : 'crosshair';
+}
+setMode('draw');
+
+// ═══════════════════════════════════════════════════════════
+// Mouse / pointer input
+// ═══════════════════════════════════════════════════════════
+canvas.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  const wp = s2w(e.clientX, e.clientY);
+
+  if (mode === 'draw') {
+    isPainting = true;
+    currentLine = { points: [{ x: wp.x, y: wp.y }], width: lineWidth };
+  } else if (mode === 'erase') {
+    isPainting = true;
+    eraseAt(wp);
+  } else if (mode === 'place') {
+    placeRobot(wp.x, wp.y);
+  } else if (mode === 'pan') {
+    isPanning = true;
+    lastPanPos = { x: e.clientX, y: e.clientY };
+    canvas.style.cursor = 'grabbing';
+  }
+});
+
+canvas.addEventListener('mousemove', e => {
+  mouseScrPos = { x: e.clientX, y: e.clientY };
+  const wp = s2w(e.clientX, e.clientY);
+
+  if (mode === 'draw' && isPainting && currentLine) {
+    // Only add point if moved enough (avoids huge arrays on slow drags)
+    const last = currentLine.points.at(-1);
+    const dx = wp.x - last.x, dy = wp.y - last.y;
+    if (dx * dx + dy * dy >= 4) currentLine.points.push({ x: wp.x, y: wp.y });
+  } else if (mode === 'erase' && isPainting) {
+    eraseAt(wp);
+  } else if (mode === 'pan' && isPanning) {
+    panX += e.clientX - lastPanPos.x;
+    panY += e.clientY - lastPanPos.y;
+    lastPanPos = { x: e.clientX, y: e.clientY };
+  }
+});
+
+function endPaint() {
+  if (mode === 'draw' && isPainting && currentLine) {
+    if (currentLine.points.length > 1) lines.push(currentLine);
+    currentLine = null;
+  }
+  isPainting = false;
+  isPanning  = false;
+  if (mode === 'pan') canvas.style.cursor = 'grab';
+  updateStatus();
+}
+
+canvas.addEventListener('mouseup',    endPaint);
+canvas.addEventListener('mouseleave', endPaint);
+
+// Right-click → delete nearest robot
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const wp  = s2w(e.clientX, e.clientY);
+  let minD  = 36, minI = -1;
+  robots.forEach((r, i) => {
+    const d = Math.hypot(r.x - wp.x, r.y - wp.y);
+    if (d < minD) { minD = d; minI = i; }
+  });
+  if (minI !== -1) { robots.splice(minI, 1); updateStatus(); }
+});
+
+// Keyboard shortcuts
+window.addEventListener('keydown', e => {
+  if (e.target.closest('#code-panel')) return; // don't intercept editor
+  const k = e.key.toLowerCase();
+  if (k === 'd') setMode('draw');
+  else if (k === 'e') setMode('erase');
+  else if (k === 'p') setMode('place');
+  else if (k === ' ') { e.preventDefault(); setMode('pan'); }
+  else if (k === 'c') toggleCodePanel();
+});
+window.addEventListener('keyup', e => {
+  if (e.key === ' ' && mode === 'pan') setMode('draw');
+});
+
+// ═══════════════════════════════════════════════════════════
+// Erase
+// ═══════════════════════════════════════════════════════════
+function eraseAt(wp) {
+  const r2 = eraseRadius * eraseRadius;
+
+  for (let li = lines.length - 1; li >= 0; li--) {
+    const pts  = lines[li].points;
+    const w    = lines[li].width;
+    const segs = [];     // resulting sub-polylines
+    let   seg  = [];
+
+    for (const p of pts) {
+      const dx = p.x - wp.x, dy = p.y - wp.y;
+      if (dx * dx + dy * dy > r2) {
+        seg.push(p);
+      } else {
+        if (seg.length > 1) segs.push({ points: seg, width: w });
+        seg = [];
+      }
+    }
+    if (seg.length > 1) segs.push({ points: seg, width: w });
+
+    lines.splice(li, 1, ...segs);
+  }
+  lines = lines.filter(l => l.points.length > 1);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Robot placement
+// ═══════════════════════════════════════════════════════════
+function placeRobot(wx, wy) {
+  robots.push({
+    x: wx, y: wy, angle: 0,
+    motor:  [0, 0],
+    sensor: new Array(7).fill(false)
+  });
+  updateStatus();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Sensor detection
+// ═══════════════════════════════════════════════════════════
+function distToSeg(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+function isOnLine(sx, sy) {
+  for (const line of lines) {
+    const thresh = line.width / 2 + 1.5;
+    const pts = line.points;
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (distToSeg(sx, sy, pts[i].x, pts[i].y, pts[i+1].x, pts[i+1].y) <= thresh)
+        return true;
+    }
+  }
+  return false;
+}
+
+function updateSensors(robot) {
+  const ca = Math.cos(robot.angle), sa = Math.sin(robot.angle);
+  const cp = Math.cos(robot.angle + Math.PI / 2);
+  const sp = Math.sin(robot.angle + Math.PI / 2);
+  const halfSW = sensorArrayWidth / 2;
+
+  for (let i = 0; i < 7; i++) {
+    const t  = (i - 3) / 3;           // −1 .. +1
+    const sx = robot.x + ca * SENSOR_FRONT + cp * t * halfSW;
+    const sy = robot.y + sa * SENSOR_FRONT + sp * t * halfSW;
+    robot.sensor[i] = isOnLine(sx, sy);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Physics tick
+// ═══════════════════════════════════════════════════════════
+function tick() {
+  if (!robotFn) return;
+
+  for (const robot of robots) {
+    updateSensors(robot);
+
+    // Expose motor as a plain array the user can assign into
+    const motor = [robot.motor[0], robot.motor[1]];
+    try {
+      robotFn(robot.sensor.slice(), motor);
+      robotError = '';
+    } catch (e) {
+      robotError = e.message;
+    }
+
+    robot.motor[0] = Math.max(-255, Math.min(255, motor[0] || 0));
+    robot.motor[1] = Math.max(-255, Math.min(255, motor[1] || 0));
+
+    // Differential drive kinematics
+    const left  = robot.motor[0] * speedScale;
+    const right = robot.motor[1] * speedScale;
+    const v     = (left + right) / 2;
+    const omega = (right - left) / WHEEL_BASE;
+
+    robot.x    += v * Math.cos(robot.angle);
+    robot.y    += v * Math.sin(robot.angle);
+    robot.angle += omega;
+  }
+
+  document.getElementById('error-display').textContent = robotError;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Tick timer
+// ═══════════════════════════════════════════════════════════
+let tickTimer = null;
+
+function setTickRate(hz) {
+  if (tickTimer) clearInterval(tickTimer);
+  tickTimer = setInterval(tick, 1000 / hz);
+}
+setTickRate(30);
+
+// ═══════════════════════════════════════════════════════════
+// Rendering
+// ═══════════════════════════════════════════════════════════
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawGrid();
+
+  ctx.save();
+  ctx.translate(panX, panY);
+
+  // Lines
+  for (const line of lines) renderLine(line);
+  if (currentLine && currentLine.points.length > 1) renderLine(currentLine);
+
+  // Robots
+  for (const robot of robots) renderRobot(robot);
+
+  // Ghost robot in place mode
+  if (mode === 'place') {
+    const wp = s2w(mouseScrPos.x, mouseScrPos.y);
+    ctx.globalAlpha = 0.38;
+    renderRobot({ x: wp.x, y: wp.y, angle: 0, motor: [0,0], sensor: new Array(7).fill(false) });
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+
+  // Screen-space overlays (not affected by pan)
+  if (mode === 'erase') {
+    ctx.strokeStyle = 'rgba(255, 80, 80, 0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.arc(mouseScrPos.x, mouseScrPos.y, eraseRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+// Subtle dot grid
+function drawGrid() {
+  const step = 40;
+  const ox = ((panX % step) + step) % step;
+  const oy = ((panY % step) + step) % step;
+  ctx.fillStyle = '#1e1e2a';
+  for (let x = ox; x < canvas.width; x += step) {
+    for (let y = oy; y < canvas.height; y += step) {
+      ctx.fillRect(x - 1, y - 1, 2, 2);
+    }
+  }
+}
+
+function renderLine(line) {
+  if (line.points.length < 2) return;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth   = line.width;
+  ctx.lineCap     = 'round';
+  ctx.lineJoin    = 'round';
+  ctx.beginPath();
+  ctx.moveTo(line.points[0].x, line.points[0].y);
+  for (let i = 1; i < line.points.length; i++) ctx.lineTo(line.points[i].x, line.points[i].y);
+  ctx.stroke();
+}
+
+// ── Wheel colour helper ──────────────────────────────────
+function wheelColor(speed) {
+  if (Math.abs(speed) < 1) return 'rgb(160, 0, 0)';
+  const t = Math.abs(speed) / 255;
+  const lo = 60, hi = 240;
+  const v = Math.round(lo + t * (hi - lo));
+  return speed > 0 ? `rgb(0,${v},0)` : `rgb(0,0,${v})`;
+}
+
+// ── Draw one robot (local space: forward = +x, left = −y) ─
+function renderRobot(robot) {
+  ctx.save();
+  ctx.translate(robot.x, robot.y);
+  ctx.rotate(robot.angle);
+
+  const hw  = BODY_W / 2;
+  const hh  = BODY_H / 2;
+  const hlw = WHEEL_LEN / 2;
+
+  // ---- Wheels ----
+  // Left wheel  → local y = −(hh + WHEEL_THK/2), centre along x
+  const leftCol  = wheelColor(robot.motor[0]);
+  const rightCol = wheelColor(robot.motor[1]);
+
+  ctx.lineWidth = 1;
+
+  // Left wheel (−y side)
+  ctx.fillStyle   = leftCol;
+  ctx.strokeStyle = '#555';
+  ctx.beginPath();
+  ctx.rect(-hlw, -(hh + WHEEL_THK), WHEEL_LEN, WHEEL_THK);
+  ctx.fill(); ctx.stroke();
+
+  // Right wheel (+y side)
+  ctx.fillStyle = rightCol;
+  ctx.beginPath();
+  ctx.rect(-hlw, hh, WHEEL_LEN, WHEEL_THK);
+  ctx.fill(); ctx.stroke();
+
+  // ---- Body ----
+  ctx.fillStyle   = '#48486a';
+  ctx.strokeStyle = '#8888aa';
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath();
+  ctx.rect(-hw, -hh, BODY_W, BODY_H);
+  ctx.fill(); ctx.stroke();
+
+  // Heading arrow on body
+  ctx.strokeStyle = '#9999bb';
+  ctx.lineWidth   = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-8, 0); ctx.lineTo(hw - 8, 0);
+  ctx.moveTo(hw - 13, -4); ctx.lineTo(hw - 8, 0); ctx.lineTo(hw - 13, 4);
+  ctx.stroke();
+
+  // ---- Sensor bar ----
+  const barX   = hw + 2;
+  const halfSW = sensorArrayWidth / 2;
+
+  ctx.fillStyle   = '#222230';
+  ctx.strokeStyle = '#777';
+  ctx.lineWidth   = 1;
+  ctx.beginPath();
+  ctx.rect(barX, -halfSW, SENSOR_THICK, sensorArrayWidth);
+  ctx.fill(); ctx.stroke();
+
+  // ---- Sensor dots ----
+  for (let i = 0; i < 7; i++) {
+    const t   = (i - 3) / 3;
+    const sy  = t * halfSW;
+    const dot_x = barX + SENSOR_THICK / 2;
+
+    ctx.fillStyle   = robot.sensor[i] ? '#00ffaa' : '#2a2a3a';
+    ctx.strokeStyle = robot.sensor[i] ? '#00ffaa' : '#555';
+    ctx.lineWidth   = 0.8;
+    ctx.beginPath();
+    ctx.arc(dot_x, sy, 2.8, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Render loop
+// ═══════════════════════════════════════════════════════════
+function loop() {
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ═══════════════════════════════════════════════════════════
+// Code editor (CodeMirror)
+// ═══════════════════════════════════════════════════════════
+const DEFAULT_CODE =
+`// sensor[0..6] : boolean — true if line detected (left → right)
+// motor[0]      : left wheel  speed  (−255 reverse … 0 stop … +255 forward)
+// motor[1]      : right wheel speed
+
+// ── Simple proportional line follower ─────────────────────
+// Compute weighted error from sensor centre (index 3)
+let error = 0;
+for (let i = 0; i < 7; i++) {
+  if (sensor[i]) error += (i - 3);
+}
+
+// If no sensor sees the line, coast forward
+const anyLine = sensor.some(s => s);
+if (!anyLine) {
+  motor[0] = 60;
+  motor[1] = 60;
+} else {
+  const base = 80;
+  const kP   = 28;
+  motor[0] = base + kP * error;   // left  — turn right when error > 0
+  motor[1] = base - kP * error;   // right
+}`;
+
+const editor = CodeMirror(document.getElementById('cm-wrapper'), {
+  value:        DEFAULT_CODE,
+  mode:         'javascript',
+  theme:        'monokai',
+  lineNumbers:  true,
+  indentUnit:   2,
+  tabSize:      2,
+  indentWithTabs: false,
+  autofocus:    false
+});
+
+editor.setSize('100%', '100%');
+
+function compileCode() {
+  try {
+    robotFn    = new Function('sensor', 'motor', editor.getValue());
+    robotError = '';
+    document.getElementById('error-display').textContent = '';
+  } catch (e) {
+    robotFn    = null;
+    robotError = 'Compile error: ' + e.message;
+    document.getElementById('error-display').textContent = robotError;
+  }
+}
+
+editor.on('change', compileCode);
+compileCode();
+
+// ═══════════════════════════════════════════════════════════
+// UI helpers
+// ═══════════════════════════════════════════════════════════
+function toggleCodePanel() {
+  document.getElementById('code-panel').classList.toggle('open');
+  // Refresh CodeMirror layout after transition
+  setTimeout(() => editor.refresh(), 250);
+}
+
+function clearAll() {
+  lines  = [];
+  robots = [];
+  updateStatus();
+}
+
+function updateStatus() {
+  document.getElementById('status').textContent =
+    `robots: ${robots.length} | line segments: ${lines.length}`;
+}
+</script>
+</body>
+</html>
