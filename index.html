@@ -19,6 +19,13 @@ body {
   position: fixed;
   top: 0; left: 0;
   display: block;
+  touch-action: none;   /* prevent browser scroll/zoom on canvas */
+}
+
+/* Larger touch targets on the toolbar for finger use */
+@media (pointer: coarse) {
+  button { padding: 9px 8px; }
+  input[type=range] { height: 20px; }
 }
 
 /* ── Toolbar ─────────────────────────────────────────────── */
@@ -100,20 +107,55 @@ input[type=range] {
   margin: 2px 0;
 }
 
-/* ── Code Panel ──────────────────────────────────────────── */
+/* ── Code Panel (layout-independent base) ────────────────── */
 #code-panel {
   position: fixed;
-  top: 0; right: -440px;
-  width: 440px;
-  height: 100vh;
   background: #1e1e2e;
-  border-left: 1px solid #333;
   display: flex;
   flex-direction: column;
   z-index: 200;
-  transition: right 0.22s cubic-bezier(.4,0,.2,1);
+  /* layout class sets geometry & transition */
 }
-#code-panel.open { right: 0; }
+
+/* Side layout (default) */
+#code-panel.layout-side {
+  top: 0; right: 0;
+  width: min(440px, 100vw);
+  height: 100vh;
+  border-left: 1px solid #333;
+  transform: translateX(100%);
+  transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+}
+#code-panel.layout-side.open { transform: translateX(0); }
+
+/* Bottom layout */
+#code-panel.layout-bottom {
+  bottom: 0; left: 0; right: 0;
+  width: 100vw;
+  height: 45vh;
+  min-height: 220px;
+  border-top: 1px solid #333;
+  transform: translateY(100%);
+  transition: transform 0.22s cubic-bezier(.4,0,.2,1);
+}
+#code-panel.layout-bottom.open { transform: translateY(0); }
+#code-panel.layout-bottom #cp-hint { display: none; } /* save vertical space */
+
+/* Fullscreen layout */
+#code-panel.layout-full {
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  opacity: 0;
+  transform: scale(0.97);
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.18s;
+}
+#code-panel.layout-full.open {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
 
 #cp-header {
   display: flex;
@@ -194,6 +236,142 @@ input[type=range] {
   text-align: right;
   line-height: 1.6;
 }
+
+/* ── Robot popup ─────────────────────────────────────────── */
+#robot-popup {
+  position: fixed;
+  display: none;
+  background: rgba(14, 14, 26, 0.97);
+  border: 1px solid #445;
+  border-radius: 10px;
+  padding: 10px 13px 8px;
+  z-index: 300;
+  color: #bbb;
+  font-size: 12px;
+  font-family: monospace;
+  min-width: 195px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+  pointer-events: auto;
+}
+.rp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #99aacc;
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #2a2a3a;
+}
+.rp-close {
+  cursor: pointer;
+  color: #555;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.rp-close:hover { color: #ff7777; }
+.rp-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 5px;
+}
+.rp-label {
+  width: 54px;
+  color: #667;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.rp-bar-wrap {
+  flex: 1;
+  height: 7px;
+  background: #0e0e1a;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #2a2a3a;
+}
+/* Centre tick mark */
+.rp-bar-wrap::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 0;
+  width: 1px; height: 100%;
+  background: #334;
+}
+.rp-bar {
+  position: absolute;
+  height: 100%;
+  border-radius: 3px;
+}
+.rp-val {
+  width: 36px;
+  text-align: right;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.rp-sensors {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  padding: 7px 0 4px;
+  border-top: 1px solid #2a2a3a;
+  margin-top: 5px;
+}
+.rp-sensor-dot {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  border: 1px solid #334;
+  background: #0e0e1a;
+  transition: background 0.06s, border-color 0.06s;
+}
+.rp-sensor-dot.active {
+  background: #00ffaa;
+  border-color: #00ffaa;
+  box-shadow: 0 0 4px #00ffaa88;
+}
+#rp-paused {
+  text-align: center;
+  font-size: 10px;
+  color: #ff9944;
+  margin-top: 5px;
+  min-height: 14px;
+}
+
+/* ── Light mode ──────────────────────────────────────────── */
+body.light { background: #eeeef6; }
+body.light #toolbar {
+  background: rgba(235,235,248,0.96);
+  border-color: #ccc;
+  color: #333;
+}
+body.light .tb-label  { color: #999; }
+body.light .slider-val { color: #558; }
+body.light button {
+  background: #ddddf0;
+  border-color: #bbb;
+  color: #333;
+}
+body.light button:hover  { background: #cccce8; border-color: #999; }
+body.light button.active { background: #8888cc; border-color: #6677cc; color: #fff; }
+body.light #code-panel   { background: #f4f4fc; }
+body.light #cp-header    { background: #e8e8f6; border-color: #ccc; color: #333; }
+body.light #cp-hint      { background: #eeeef8; border-color: #ddd; color: #99a; }
+body.light #status       { color: #aaa; }
+body.light #keyhint      { color: #ccc; }
+body.light #robot-popup  {
+  background: rgba(240,240,252,0.97);
+  border-color: #aab;
+  color: #333;
+}
+body.light .rp-header   { color: #446; border-color: #ccd; }
+body.light .rp-bar-wrap { background: #dde; border-color: #ccd; }
+body.light .rp-bar-wrap::after { background: #aab; }
+body.light .rp-label    { color: #889; }
+body.light .rp-sensors  { border-color: #ccd; }
+body.light .rp-sensor-dot { background: #dde; border-color: #bbc; }
 </style>
 </head>
 <body>
@@ -268,8 +446,21 @@ input[type=range] {
   <hr class="tb-divider">
 
   <div class="tb-section">
+    <div class="tb-label">Simulation</div>
+    <div class="btn-row">
+      <button id="btn-pause" onclick="togglePause()">⏸ Pause</button>
+      <button id="btn-step"  onclick="stepOnce()" disabled>⏭ Step</button>
+    </div>
+  </div>
+
+  <hr class="tb-divider">
+
+  <div class="tb-section">
     <button onclick="toggleCodePanel()" style="width:100%">⚙ Robot Code (C)</button>
-    <button onclick="clearAll()" style="width:100%; color:#f88">⊘ Clear All</button>
+    <div class="btn-row">
+      <button onclick="toggleTheme()" id="btn-theme">☀ Light</button>
+      <button onclick="clearAll()" style="color:#f88">⊘ Clear</button>
+    </div>
   </div>
 </div>
 
@@ -277,7 +468,10 @@ input[type=range] {
 <div id="code-panel">
   <div id="cp-header">
     <span>Robot Control Code</span>
-    <button onclick="toggleCodePanel()">✕</button>
+    <div style="display:flex;gap:6px;align-items:center">
+      <button id="btn-layout" onclick="cycleLayout()" title="Cycle panel layout"></button>
+      <button onclick="toggleCodePanel()" title="Close">✕</button>
+    </div>
   </div>
   <div id="cp-hint">
     sensor[0..6]  → boolean (left to right) &nbsp;|&nbsp; motor[0] = left &nbsp; motor[1] = right<br>
@@ -287,8 +481,33 @@ input[type=range] {
   <div id="error-display"></div>
 </div>
 
+<!-- ── Robot popup ────────────────────────────────────────── -->
+<div id="robot-popup">
+  <div class="rp-header">
+    <span>Robot</span>
+    <span class="rp-close" onclick="deselectRobot()">×</span>
+  </div>
+  <div class="rp-row">
+    <span class="rp-label">Motor L</span>
+    <div class="rp-bar-wrap"><div class="rp-bar" id="rp-bar-l"></div></div>
+    <span class="rp-val" id="rp-val-l">0</span>
+  </div>
+  <div class="rp-row">
+    <span class="rp-label">Motor R</span>
+    <div class="rp-bar-wrap"><div class="rp-bar" id="rp-bar-r"></div></div>
+    <span class="rp-val" id="rp-val-r">0</span>
+  </div>
+  <div class="rp-sensors" id="rp-sensors">
+    <div class="rp-sensor-dot"></div><div class="rp-sensor-dot"></div>
+    <div class="rp-sensor-dot"></div><div class="rp-sensor-dot"></div>
+    <div class="rp-sensor-dot"></div><div class="rp-sensor-dot"></div>
+    <div class="rp-sensor-dot"></div>
+  </div>
+  <div id="rp-paused"></div>
+</div>
+
 <div id="status">robots: 0 | lines: 0</div>
-<div id="keyhint">D draw · E erase · P place · Space pan · C code · RClick delete robot</div>
+<div id="keyhint">D draw · E erase · P place · Space pan · C code · RClick/long-press delete robot · 2-finger pan</div>
 
 <!-- CodeMirror -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
@@ -331,8 +550,13 @@ let robotError = '';
 
 let isPainting = false;
 let isPanning  = false;
-let lastPanPos = { x: 0, y: 0 };
+let lastPanPos  = { x: 0, y: 0 };
 let mouseScrPos = { x: 0, y: 0 }; // screen coords, for ghost/erase cursor
+let mouseDownScr = null;           // screen pos at mousedown, for click detection
+
+let selectedRobot = null;  // robot shown in popup
+let paused        = false;
+let isDark        = true;
 
 // ═══════════════════════════════════════════════════════════
 // Canvas setup
@@ -369,6 +593,7 @@ setMode('draw');
 // ═══════════════════════════════════════════════════════════
 canvas.addEventListener('mousedown', e => {
   if (e.button !== 0) return;
+  mouseDownScr = { x: e.clientX, y: e.clientY };
   const wp = s2w(e.clientX, e.clientY);
 
   if (mode === 'draw') {
@@ -404,6 +629,11 @@ canvas.addEventListener('mousemove', e => {
   }
 });
 
+function cancelPaint() {
+  currentLine = null;
+  isPainting  = false;
+}
+
 function endPaint() {
   if (mode === 'draw' && isPainting && currentLine) {
     if (currentLine.points.length > 1) lines.push(currentLine);
@@ -415,7 +645,15 @@ function endPaint() {
   updateStatus();
 }
 
-canvas.addEventListener('mouseup',    endPaint);
+canvas.addEventListener('mouseup', e => {
+  if (e.button !== 0) return;
+  if (mouseDownScr) {
+    const dx = e.clientX - mouseDownScr.x, dy = e.clientY - mouseDownScr.y;
+    if (dx * dx + dy * dy < 64) checkRobotClick(s2w(e.clientX, e.clientY));
+  }
+  mouseDownScr = null;
+  endPaint();
+});
 canvas.addEventListener('mouseleave', endPaint);
 
 // Right-click → delete nearest robot
@@ -429,6 +667,145 @@ canvas.addEventListener('contextmenu', e => {
   });
   if (minI !== -1) { robots.splice(minI, 1); updateStatus(); }
 });
+
+// ═══════════════════════════════════════════════════════════
+// Touch input
+// ═══════════════════════════════════════════════════════════
+let touchStartScr  = null;   // {x,y} screen coords at touchstart
+let touchStartWp   = null;   // world coords at touchstart
+let touchDidMove   = false;  // finger moved >8px from start
+let touchLongTimer = null;
+let twoFinger      = false;  // two-finger pan is active
+
+function touchMid(touches) {
+  return {
+    x: (touches[0].clientX + touches[1].clientX) / 2,
+    y: (touches[0].clientY + touches[1].clientY) / 2
+  };
+}
+
+function cancelLongPress() {
+  if (touchLongTimer) { clearTimeout(touchLongTimer); touchLongTimer = null; }
+}
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+
+  if (e.touches.length >= 2) {
+    // Two fingers: switch to pan, cancel any ongoing draw/erase
+    twoFinger = true;
+    cancelLongPress();
+    cancelPaint();
+    lastPanPos = touchMid(e.touches);
+    isPanning  = true;
+    return;
+  }
+
+  // Single finger
+  twoFinger = false;
+  const t = e.touches[0];
+  mouseScrPos   = { x: t.clientX, y: t.clientY };
+  touchStartScr = { x: t.clientX, y: t.clientY };
+  touchStartWp  = s2w(t.clientX, t.clientY);
+  touchDidMove  = false;
+
+  if (mode === 'draw') {
+    isPainting  = true;
+    currentLine = { points: [{ ...touchStartWp }], width: lineWidth };
+  } else if (mode === 'erase') {
+    isPainting = true;
+    eraseAt(touchStartWp);
+  } else if (mode === 'pan') {
+    isPanning  = true;
+    lastPanPos = { x: t.clientX, y: t.clientY };
+  }
+  // 'place' mode: robot is placed on touchend (tap), not here
+
+  // Long-press (600 ms, no move) → delete nearest robot
+  touchLongTimer = setTimeout(() => {
+    touchLongTimer = null;
+    if (touchDidMove) return;
+    cancelPaint();
+    const wp = touchStartWp;
+    let minD = 44, minI = -1;
+    robots.forEach((r, i) => {
+      const d = Math.hypot(r.x - wp.x, r.y - wp.y);
+      if (d < minD) { minD = d; minI = i; }
+    });
+    if (minI !== -1) { robots.splice(minI, 1); updateStatus(); }
+  }, 600);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+
+  // Two-finger pan (works even if we started with one finger)
+  if (e.touches.length >= 2 || twoFinger) {
+    if (!twoFinger) { twoFinger = true; cancelLongPress(); cancelPaint(); }
+    if (e.touches.length >= 2) {
+      const mid = touchMid(e.touches);
+      panX += mid.x - lastPanPos.x;
+      panY += mid.y - lastPanPos.y;
+      lastPanPos = mid;
+    }
+    return;
+  }
+
+  const t = e.touches[0];
+  mouseScrPos = { x: t.clientX, y: t.clientY };
+  const wp    = s2w(t.clientX, t.clientY);
+
+  // Mark as moved once past 8 px threshold
+  if (!touchDidMove && touchStartScr) {
+    const dx = t.clientX - touchStartScr.x, dy = t.clientY - touchStartScr.y;
+    if (dx * dx + dy * dy > 64) { touchDidMove = true; cancelLongPress(); }
+  }
+
+  if (mode === 'draw' && isPainting && currentLine) {
+    const last = currentLine.points.at(-1);
+    const dx = wp.x - last.x, dy = wp.y - last.y;
+    if (dx * dx + dy * dy >= 4) currentLine.points.push({ x: wp.x, y: wp.y });
+  } else if (mode === 'erase' && isPainting) {
+    eraseAt(wp);
+  } else if (mode === 'pan' && isPanning) {
+    panX += t.clientX - lastPanPos.x;
+    panY += t.clientY - lastPanPos.y;
+    lastPanPos = { x: t.clientX, y: t.clientY };
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  cancelLongPress();
+
+  // Tap (no movement, single finger) → place robot or select robot
+  if (!touchDidMove && !twoFinger && touchStartWp) {
+    if (mode === 'place') placeRobot(touchStartWp.x, touchStartWp.y);
+    else checkRobotClick(touchStartWp);
+  }
+
+  if (e.touches.length === 0) {
+    // All fingers lifted
+    twoFinger = false;
+    isPanning  = false;
+    endPaint();
+  } else if (e.touches.length === 1 && twoFinger) {
+    // Went from 2 fingers → 1: keep panning with remaining finger
+    lastPanPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }
+
+  touchStartScr = null;
+  touchStartWp  = null;
+}, { passive: false });
+
+canvas.addEventListener('touchcancel', e => {
+  cancelLongPress();
+  twoFinger = false;
+  isPanning  = false;
+  endPaint();
+  touchStartScr = null;
+  touchStartWp  = null;
+}, { passive: false });
 
 // Keyboard shortcuts
 window.addEventListener('keydown', e => {
@@ -524,13 +901,12 @@ function updateSensors(robot) {
 // ═══════════════════════════════════════════════════════════
 // Physics tick
 // ═══════════════════════════════════════════════════════════
-function tick() {
+function runTick() {
   if (!robotFn) return;
 
   for (const robot of robots) {
     updateSensors(robot);
 
-    // Expose motor as a plain array the user can assign into
     const motor = [robot.motor[0], robot.motor[1]];
     try {
       robotFn(robot.sensor.slice(), motor);
@@ -548,12 +924,32 @@ function tick() {
     const v     = (left + right) / 2;
     const omega = (right - left) / WHEEL_BASE;
 
-    robot.x    += v * Math.cos(robot.angle);
-    robot.y    += v * Math.sin(robot.angle);
+    robot.x     += v * Math.cos(robot.angle);
+    robot.y     += v * Math.sin(robot.angle);
     robot.angle += omega;
   }
 
   document.getElementById('error-display').textContent = robotError;
+}
+
+function tick() {
+  if (paused) return;
+  runTick();
+}
+
+// ── Pause / Step ─────────────────────────────────────────
+function togglePause() {
+  paused = !paused;
+  const btn = document.getElementById('btn-pause');
+  btn.textContent = paused ? '▶ Resume' : '⏸ Pause';
+  btn.classList.toggle('active', paused);
+  document.getElementById('btn-step').disabled = !paused;
+  updateStatus();
+}
+
+function stepOnce() {
+  if (!paused) return;
+  runTick();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -604,6 +1000,8 @@ function render() {
     ctx.stroke();
     ctx.setLineDash([]);
   }
+
+  updatePopup();
 }
 
 // Subtle dot grid
@@ -611,7 +1009,7 @@ function drawGrid() {
   const step = 40;
   const ox = ((panX % step) + step) % step;
   const oy = ((panY % step) + step) % step;
-  ctx.fillStyle = '#1e1e2a';
+  ctx.fillStyle = isDark ? '#1e1e2a' : '#d8d8e8';
   for (let x = ox; x < canvas.width; x += step) {
     for (let y = oy; y < canvas.height; y += step) {
       ctx.fillRect(x - 1, y - 1, 2, 2);
@@ -621,7 +1019,7 @@ function drawGrid() {
 
 function renderLine(line) {
   if (line.points.length < 2) return;
-  ctx.strokeStyle = '#ffffff';
+  ctx.strokeStyle = isDark ? '#ffffff' : '#111111';
   ctx.lineWidth   = line.width;
   ctx.lineCap     = 'round';
   ctx.lineJoin    = 'round';
@@ -711,6 +1109,17 @@ function renderRobot(robot) {
     ctx.fill(); ctx.stroke();
   }
 
+  // ---- Selection ring ----
+  if (robot === selectedRobot) {
+    ctx.strokeStyle = 'rgba(255, 210, 50, 0.85)';
+    ctx.lineWidth   = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
   ctx.restore();
 }
 
@@ -781,21 +1190,131 @@ compileCode();
 // ═══════════════════════════════════════════════════════════
 // UI helpers
 // ═══════════════════════════════════════════════════════════
+// ── Code panel layout ────────────────────────────────────
+const LAYOUTS = [
+  { key: 'side',   label: '▶ Side',   title: 'Switch to bottom layout' },
+  { key: 'bottom', label: '▼ Bottom', title: 'Switch to fullscreen layout' },
+  { key: 'full',   label: '⛶ Full',  title: 'Switch to side layout' },
+];
+let layoutIndex = 0;
+
+function applyLayout() {
+  const panel = document.getElementById('code-panel');
+  LAYOUTS.forEach(l => panel.classList.remove('layout-' + l.key));
+  const L = LAYOUTS[layoutIndex];
+  panel.classList.add('layout-' + L.key);
+  const btn = document.getElementById('btn-layout');
+  const next = LAYOUTS[(layoutIndex + 1) % LAYOUTS.length];
+  btn.textContent = L.label;
+  btn.title       = next.title;
+}
+
+function cycleLayout() {
+  const isOpen = document.getElementById('code-panel').classList.contains('open');
+  layoutIndex = (layoutIndex + 1) % LAYOUTS.length;
+  applyLayout();
+  // Re-open in new layout if it was open
+  if (isOpen) {
+    document.getElementById('code-panel').classList.add('open');
+  }
+  setTimeout(() => editor.refresh(), 250);
+}
+
+applyLayout(); // set initial layout class
+
 function toggleCodePanel() {
   document.getElementById('code-panel').classList.toggle('open');
-  // Refresh CodeMirror layout after transition
   setTimeout(() => editor.refresh(), 250);
 }
 
 function clearAll() {
   lines  = [];
   robots = [];
+  deselectRobot();
   updateStatus();
 }
 
 function updateStatus() {
+  const pausedTag = paused ? ' | ⏸ PAUSED' : '';
   document.getElementById('status').textContent =
-    `robots: ${robots.length} | line segments: ${lines.length}`;
+    `robots: ${robots.length} | line segments: ${lines.length}${pausedTag}`;
+}
+
+// ── Theme ─────────────────────────────────────────────────
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.classList.toggle('light', !isDark);
+  editor.setOption('theme', isDark ? 'monokai' : 'default');
+  document.getElementById('btn-theme').textContent = isDark ? '☀ Light' : '☾ Dark';
+}
+
+// ── Robot selection & popup ───────────────────────────────
+function checkRobotClick(wp) {
+  const hit = robots.find(r => Math.hypot(r.x - wp.x, r.y - wp.y) < 32);
+  if (hit) selectRobot(hit);
+  else deselectRobot();
+}
+
+function selectRobot(robot) {
+  selectedRobot = robot;
+  document.getElementById('robot-popup').style.display = 'block';
+}
+
+function deselectRobot() {
+  selectedRobot = null;
+  document.getElementById('robot-popup').style.display = 'none';
+}
+
+// Motor bar: centre-anchored, green=forward, blue=reverse
+const rBarL  = document.getElementById('rp-bar-l');
+const rBarR  = document.getElementById('rp-bar-r');
+const rValL  = document.getElementById('rp-val-l');
+const rValR  = document.getElementById('rp-val-r');
+const rSens  = document.getElementById('rp-sensors');
+const rPause = document.getElementById('rp-paused');
+const rDots  = rSens.querySelectorAll('.rp-sensor-dot');
+const rPopup = document.getElementById('robot-popup');
+
+function setMotorBar(barEl, valEl, speed) {
+  const pct = Math.abs(speed) / 255 * 50;  // 0..50 (half of bar)
+  if (speed >= 0) {
+    barEl.style.left       = '50%';
+    barEl.style.width      = pct + '%';
+    barEl.style.background = Math.abs(speed) < 1 ? '#600' : '#0a0';
+  } else {
+    barEl.style.left       = (50 - pct) + '%';
+    barEl.style.width      = pct + '%';
+    barEl.style.background = '#008';
+  }
+  valEl.textContent  = (speed >= 0 ? '+' : '') + Math.round(speed);
+  valEl.style.color  = speed > 1 ? '#6f6' : speed < -1 ? '#88f' : '#f44';
+}
+
+function updatePopup() {
+  if (!selectedRobot) return;
+  if (!robots.includes(selectedRobot)) { deselectRobot(); return; }
+
+  // Reposition popup near robot, keeping within viewport
+  const sx = selectedRobot.x + panX;
+  const sy = selectedRobot.y + panY;
+  let px = sx + 44, py = sy - 90;
+  const pw = rPopup.offsetWidth, ph = rPopup.offsetHeight;
+  if (px + pw > window.innerWidth  - 8) px = sx - pw - 44;
+  if (py < 8)                           py = sy + 44;
+  if (py + ph > window.innerHeight - 8) py = window.innerHeight - ph - 8;
+  rPopup.style.left = px + 'px';
+  rPopup.style.top  = py + 'px';
+
+  // Values
+  setMotorBar(rBarL, rValL, selectedRobot.motor[0]);
+  setMotorBar(rBarR, rValR, selectedRobot.motor[1]);
+
+  // Sensor dots
+  rDots.forEach((dot, i) => {
+    dot.classList.toggle('active', !!selectedRobot.sensor[i]);
+  });
+
+  rPause.textContent = paused ? '⏸ Simulation paused' : '';
 }
 </script>
 </body>
