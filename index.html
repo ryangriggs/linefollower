@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Line Follower Simulator</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/monokai.min.css">
@@ -13,6 +14,11 @@ body {
   background: #111118;
   font-family: 'Segoe UI', sans-serif;
   user-select: none;
+  /* Safe-area padding for notched iPads / iPhones */
+  padding-top:    env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left:   env(safe-area-inset-left);
+  padding-right:  env(safe-area-inset-right);
 }
 
 #canvas {
@@ -31,7 +37,8 @@ body {
 /* ── Toolbar ─────────────────────────────────────────────── */
 #toolbar {
   position: fixed;
-  top: 12px; left: 12px;
+  top: calc(12px + env(safe-area-inset-top));
+  left: calc(12px + env(safe-area-inset-left));
   background: rgba(18, 18, 32, 0.93);
   border: 1px solid #333;
   border-radius: 10px;
@@ -44,6 +51,10 @@ body {
   font-size: 12px;
   min-width: 190px;
   backdrop-filter: blur(6px);
+  /* Scrollable toolbar for small screens / portrait iPad */
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .tb-section {
@@ -107,6 +118,37 @@ input[type=range] {
   margin: 2px 0;
 }
 
+/* Code panel header button strip */
+#cp-btn-strip {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+#cp-btn-strip button {
+  padding: 3px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+#cp-feedback {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: #2a3a2a;
+  color: #8f8;
+  border: 1px solid #4a6a4a;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  pointer-events: none;
+  white-space: nowrap;
+  animation: fadeout 1.6s forwards;
+}
+@keyframes fadeout {
+  0%   { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* ── Code Panel (layout-independent base) ────────────────── */
 #code-panel {
   position: fixed;
@@ -121,7 +163,7 @@ input[type=range] {
 #code-panel.layout-side {
   top: 0; right: 0;
   width: min(440px, 100vw);
-  height: 100vh;
+  height: 100dvh;
   border-left: 1px solid #333;
   transform: translateX(100%);
   transition: transform 0.22s cubic-bezier(.4,0,.2,1);
@@ -132,20 +174,21 @@ input[type=range] {
 #code-panel.layout-bottom {
   bottom: 0; left: 0; right: 0;
   width: 100vw;
-  height: 45vh;
-  min-height: 220px;
+  height: 48dvh;
+  min-height: 240px;
   border-top: 1px solid #333;
+  padding-bottom: env(safe-area-inset-bottom);
   transform: translateY(100%);
   transition: transform 0.22s cubic-bezier(.4,0,.2,1);
 }
 #code-panel.layout-bottom.open { transform: translateY(0); }
-#code-panel.layout-bottom #cp-hint { display: none; } /* save vertical space */
+#code-panel.layout-bottom #cp-hint { display: none; }
 
 /* Fullscreen layout */
 #code-panel.layout-full {
   top: 0; left: 0;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   opacity: 0;
   transform: scale(0.97);
   pointer-events: none;
@@ -459,7 +502,7 @@ body.light .rp-sensor-dot { background: #dde; border-color: #bbc; }
     <button onclick="toggleCodePanel()" style="width:100%">⚙ Robot Code (C)</button>
     <div class="btn-row">
       <button onclick="toggleTheme()" id="btn-theme">☀ Light</button>
-      <button onclick="clearAll()" style="color:#f88">⊘ Clear</button>
+      <button onclick="clearScene()" style="color:#f88">⊘ Clear Scene</button>
     </div>
   </div>
 </div>
@@ -468,8 +511,11 @@ body.light .rp-sensor-dot { background: #dde; border-color: #bbc; }
 <div id="code-panel">
   <div id="cp-header">
     <span>Robot Control Code</span>
-    <div style="display:flex;gap:6px;align-items:center">
-      <button id="btn-layout" onclick="cycleLayout()" title="Cycle panel layout"></button>
+    <div id="cp-btn-strip" style="position:relative">
+      <button onclick="copyCode()"   title="Copy all code to clipboard">Copy</button>
+      <button onclick="pasteCode()"  title="Paste from clipboard">Paste</button>
+      <button onclick="clearCode()"  title="Clear editor" style="color:#f88">Clear</button>
+      <button id="btn-layout" onclick="cycleLayout()" title="Cycle layout"></button>
       <button onclick="toggleCodePanel()" title="Close">✕</button>
     </div>
   </div>
@@ -565,10 +611,19 @@ const canvas = document.getElementById('canvas');
 const ctx    = canvas.getContext('2d');
 
 function resize() {
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
+  // Use visualViewport when available (correct on iOS with virtual keyboard)
+  const vv = window.visualViewport;
+  canvas.width  = vv ? vv.width  : window.innerWidth;
+  canvas.height = vv ? vv.height : window.innerHeight;
 }
+
+// Listen on both resize and visualViewport resize (covers iOS orientation changes)
 window.addEventListener('resize', resize);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', resize);
+}
+// Extra pass after orientation settles (iOS fires resize before layout is final)
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
 resize();
 
 // ═══════════════════════════════════════════════════════════
@@ -1159,22 +1214,26 @@ if (!anyLine) {
   motor[1] = base - kP * error;   // right
 }`;
 
+const LS_KEY = 'linefollower_code';
+
 const editor = CodeMirror(document.getElementById('cm-wrapper'), {
-  value:        DEFAULT_CODE,
-  mode:         'javascript',
-  theme:        'monokai',
-  lineNumbers:  true,
-  indentUnit:   2,
-  tabSize:      2,
+  value:          localStorage.getItem(LS_KEY) ?? DEFAULT_CODE,
+  mode:           'javascript',
+  theme:          'monokai',
+  lineNumbers:    true,
+  indentUnit:     2,
+  tabSize:        2,
   indentWithTabs: false,
-  autofocus:    false
+  autofocus:      false
 });
 
 editor.setSize('100%', '100%');
 
 function compileCode() {
+  const code = editor.getValue();
+  localStorage.setItem(LS_KEY, code);
   try {
-    robotFn    = new Function('sensor', 'motor', editor.getValue());
+    robotFn    = new Function('sensor', 'motor', code);
     robotError = '';
     document.getElementById('error-display').textContent = '';
   } catch (e) {
@@ -1227,11 +1286,60 @@ function toggleCodePanel() {
   setTimeout(() => editor.refresh(), 250);
 }
 
-function clearAll() {
+function clearScene() {
   lines  = [];
   robots = [];
   deselectRobot();
   updateStatus();
+}
+
+// ── Code panel actions ────────────────────────────────────
+let feedbackTimer = null;
+
+function showCpFeedback(msg, isError = false) {
+  const strip = document.getElementById('cp-btn-strip');
+  const old   = strip.querySelector('#cp-feedback');
+  if (old) old.remove();
+  if (feedbackTimer) clearTimeout(feedbackTimer);
+  const el = document.createElement('div');
+  el.id = 'cp-feedback';
+  el.textContent = msg;
+  if (isError) el.style.cssText = 'background:#3a0808;color:#f88;border-color:#600';
+  strip.appendChild(el);
+  feedbackTimer = setTimeout(() => el.remove(), 1700);
+}
+
+async function copyCode() {
+  try {
+    await navigator.clipboard.writeText(editor.getValue());
+    showCpFeedback('Copied!');
+  } catch {
+    // Fallback: select all text in a temp textarea
+    const ta = document.createElement('textarea');
+    ta.value = editor.getValue();
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    showCpFeedback('Copied!');
+  }
+}
+
+async function pasteCode() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (text) { editor.setValue(text); showCpFeedback('Pasted!'); }
+  } catch {
+    showCpFeedback('Use Ctrl/Cmd+V in the editor', true);
+  }
+}
+
+function clearCode() {
+  if (!editor.getValue().trim()) return;
+  if (confirm('Clear the editor?')) {
+    editor.setValue('');
+    localStorage.removeItem(LS_KEY);
+  }
 }
 
 function updateStatus() {
