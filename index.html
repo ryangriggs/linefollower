@@ -415,14 +415,145 @@ body.light .rp-bar-wrap::after { background: #aab; }
 body.light .rp-label    { color: #889; }
 body.light .rp-sensors  { border-color: #ccd; }
 body.light .rp-sensor-dot { background: #dde; border-color: #bbc; }
+
+/* ── Shape selection handles ─────────────────────────────── */
+.shape-handle {
+  /* drawn on canvas, not DOM — this is just a reference comment */
+}
+/* Poly-in-progress "Done" button */
+#poly-done-btn {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #4a4aaa;
+  border: 1px solid #88f;
+  color: #dde;
+  border-radius: 20px;
+  padding: 8px 22px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 150;
+  display: none;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.5);
+}
+body.light #poly-done-btn {
+  background: #8888cc;
+  border-color: #6677cc;
+  color: #fff;
+}
+
+/* ── Toolbar collapse ────────────────────────────────────── */
+#btn-tb-toggle {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  left: calc(12px + env(safe-area-inset-left));
+  z-index: 102;
+  background: rgba(18, 18, 32, 0.93);
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #bbb;
+  padding: 6px 9px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  display: none;          /* hidden while toolbar is visible */
+}
+body.light #btn-tb-toggle {
+  background: rgba(235,235,248,0.96);
+  border-color: #ccc;
+  color: #333;
+}
+
+/* ── Debug box ───────────────────────────────────────────── */
+#debug-box {
+  position: fixed;
+  top: 80px;
+  right: 12px;
+  width: 260px;
+  background: rgba(12, 12, 24, 0.97);
+  border: 1px solid #445;
+  border-radius: 10px;
+  z-index: 250;
+  font-family: monospace;
+  font-size: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+  display: none;
+  user-select: none;
+}
+#debug-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  background: #16162a;
+  border-bottom: 1px solid #2a2a40;
+  border-radius: 10px 10px 0 0;
+  cursor: grab;
+  color: #99aacc;
+  font-weight: bold;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+#debug-box-header:active { cursor: grabbing; }
+#debug-hdr-btns { display: flex; gap: 4px; }
+#debug-hdr-btns button {
+  background: none;
+  border: 1px solid #445;
+  border-radius: 4px;
+  color: #667;
+  padding: 1px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+#debug-hdr-btns button:hover { color: #f88; border-color: #644; }
+#debug-box-body {
+  padding: 5px 0;
+  max-height: 320px;
+  min-height: 32px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.dbg-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 10px;
+  border-bottom: 1px solid #12121e;
+}
+.dbg-row:last-child { border-bottom: none; }
+.dbg-key { color: #88aaff; flex-shrink: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dbg-val { color: #aaffaa; text-align: right; word-break: break-all; }
+.dbg-empty { color: #334; padding: 8px 10px; }
+
+body.light #debug-box {
+  background: rgba(240,240,252,0.97);
+  border-color: #aab;
+}
+body.light #debug-box-header { background: #e0e0f0; border-color: #ccd; color: #446; }
+body.light #debug-hdr-btns button { border-color: #bbc; color: #99a; }
+body.light .dbg-row { border-color: #e0e0ee; }
+body.light .dbg-key { color: #446; }
+body.light .dbg-val { color: #363; }
+body.light .dbg-empty { color: #bbc; }
 </style>
 </head>
 <body>
 
 <canvas id="canvas"></canvas>
 
+<!-- Shown only when toolbar is collapsed -->
+<button id="btn-tb-toggle" onclick="toggleToolbar()" title="Show toolbar">☰</button>
+
 <!-- ── Toolbar ───────────────────────────────────────────── -->
 <div id="toolbar">
+  <!-- Collapse button — always at top -->
+  <button onclick="toggleToolbar()" title="Hide toolbar"
+          style="width:100%;text-align:left;color:#667;font-size:11px;padding:3px 4px">◀ hide</button>
+
   <div class="tb-section">
     <div class="tb-label">Mode</div>
     <div class="btn-row">
@@ -452,6 +583,24 @@ body.light .rp-sensor-dot { background: #dde; border-color: #bbc; }
       </div>
       <input type="range" id="sld-er" min="5" max="60" value="18"
         oninput="eraseRadius=+this.value; document.getElementById('val-er').textContent=this.value">
+    </div>
+  </div>
+
+  <hr class="tb-divider">
+
+  <div class="tb-section">
+    <div class="tb-label">Shapes</div>
+    <div class="btn-row">
+      <button id="btn-poly"     onclick="setMode('poly')"    title="Polyline — click to add points, double-click/Done to finish">⟆ Poly</button>
+      <button id="btn-select"   onclick="setMode('select')"  title="Select &amp; resize shapes — drag body to move, drag handle to resize">↖ Select</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-circle"   onclick="setMode('circle')"   title="Draw circle — drag from centre outward">○ Circle</button>
+      <button id="btn-rect"     onclick="setMode('rect')"     title="Draw rectangle — drag corner to corner">□ Rect</button>
+    </div>
+    <div class="btn-row">
+      <button id="btn-triangle" onclick="setMode('triangle')" title="Draw equilateral triangle — drag from centre">△ Triangle</button>
+      <button id="btn-filled"   onclick="toggleFilled()">◯ Hollow</button>
     </div>
   </div>
 
@@ -504,6 +653,9 @@ body.light .rp-sensor-dot { background: #dde; border-color: #bbc; }
       <button onclick="toggleTheme()" id="btn-theme">☀ Light</button>
       <button onclick="clearScene()" style="color:#f88">⊘ Clear Scene</button>
     </div>
+    <div class="btn-row">
+      <button id="btn-debug" onclick="toggleDebugBox()">⬚ Debug</button>
+    </div>
   </div>
 </div>
 
@@ -552,6 +704,19 @@ body.light .rp-sensor-dot { background: #dde; border-color: #bbc; }
   <div id="rp-paused"></div>
 </div>
 
+<!-- ── Debug box ──────────────────────────────────────────── -->
+<div id="debug-box">
+  <div id="debug-box-header">
+    <span>DEBUG</span>
+    <div id="debug-hdr-btns">
+      <button onclick="debugValues.clear(); debugDirty=true;" title="Clear all values">Clear</button>
+      <button onclick="toggleDebugBox()" title="Close">×</button>
+    </div>
+  </div>
+  <div id="debug-box-body"><div class="dbg-empty">No values yet — call debug(name, value) in robot code</div></div>
+</div>
+
+<button id="poly-done-btn" onclick="finishPoly()">✓ Done (dbl-click)</button>
 <div id="status">robots: 0 | lines: 0</div>
 <div id="keyhint">D draw · E erase · P place · Space pan · C code · RClick/long-press delete robot · 2-finger pan</div>
 
@@ -600,9 +765,41 @@ let lastPanPos  = { x: 0, y: 0 };
 let mouseScrPos = { x: 0, y: 0 }; // screen coords, for ghost/erase cursor
 let mouseDownScr = null;           // screen pos at mousedown, for click detection
 
-let selectedRobot = null;  // robot shown in popup
-let paused        = false;
-let isDark        = true;
+let selectedRobot  = null;  // robot shown in popup
+let paused         = false;
+let isDark         = true;
+let toolbarVisible = true;
+let debugBoxOpen   = false;
+
+// ── Debug values ──────────────────────────────────────────
+const debugValues = new Map();
+let   debugDirty  = false;
+
+// Global debug() function — callable from robot code
+window.debug = function(name, value) {
+  debugValues.set(String(name), value);
+  debugDirty = true;
+};
+
+// ── Shape state ───────────────────────────────────────────
+// shapes: { type:'circle'|'rect'|'triangle'|'polyline', width, filled?, cx?,cy?,r?,rx?,ry?, points? }
+let shapes       = [];
+let shapesFilled = false;   // current filled/hollow toggle
+
+// Polyline-in-progress
+let polyPoints  = [];       // [{x,y}] vertices placed so far
+let polyLastMs  = 0;        // timestamp of last click (double-click detect)
+
+// Shape drag-draw (circle/rect/triangle)
+let shapeDragStart   = null;  // world {x,y} at mousedown
+let shapeDragPreview = null;  // live preview shape object
+
+// Select-mode drag
+let selectedShape    = null;  // currently selected shape
+let selDragType      = null;  // 'body' | 'handle'
+let selDragHandleIdx = -1;
+let selDragStart     = null;  // world {x,y} where drag began
+let selDragSnap      = null;  // deep-copy of shape at drag start
 
 // ═══════════════════════════════════════════════════════════
 // Canvas setup
@@ -634,12 +831,19 @@ function s2w(sx, sy) { return { x: sx - panX, y: sy - panY }; }
 // ═══════════════════════════════════════════════════════════
 // Mode
 // ═══════════════════════════════════════════════════════════
+const ALL_MODES = ['draw','erase','place','pan','poly','circle','rect','triangle','select'];
+
 function setMode(m) {
+  if (mode === 'poly' && m !== 'poly') cancelPoly();
+  if (mode === 'select' && m !== 'select') { selectedShape = null; selDragType = null; }
   mode = m;
-  ['draw','erase','place','pan'].forEach(id =>
-    document.getElementById('btn-' + id).classList.toggle('active', id === m)
-  );
-  canvas.style.cursor = m === 'pan' ? 'grab' : 'crosshair';
+  ALL_MODES.forEach(id => {
+    const btn = document.getElementById('btn-' + id);
+    if (btn) btn.classList.toggle('active', id === m);
+  });
+  if (m === 'pan')    canvas.style.cursor = 'grab';
+  else if (m === 'select') canvas.style.cursor = 'default';
+  else                canvas.style.cursor = 'crosshair';
 }
 setMode('draw');
 
@@ -663,7 +867,14 @@ canvas.addEventListener('mousedown', e => {
     isPanning = true;
     lastPanPos = { x: e.clientX, y: e.clientY };
     canvas.style.cursor = 'grabbing';
+  } else if (mode === 'circle' || mode === 'rect' || mode === 'triangle') {
+    shapeDragStart   = wp;
+    shapeDragPreview = null;
+    isPainting = true;
+  } else if (mode === 'select') {
+    startSelectDrag(wp);
   }
+  // poly clicks handled by the canvas 'click' listener below
 });
 
 canvas.addEventListener('mousemove', e => {
@@ -671,7 +882,6 @@ canvas.addEventListener('mousemove', e => {
   const wp = s2w(e.clientX, e.clientY);
 
   if (mode === 'draw' && isPainting && currentLine) {
-    // Only add point if moved enough (avoids huge arrays on slow drags)
     const last = currentLine.points.at(-1);
     const dx = wp.x - last.x, dy = wp.y - last.y;
     if (dx * dx + dy * dy >= 4) currentLine.points.push({ x: wp.x, y: wp.y });
@@ -681,6 +891,10 @@ canvas.addEventListener('mousemove', e => {
     panX += e.clientX - lastPanPos.x;
     panY += e.clientY - lastPanPos.y;
     lastPanPos = { x: e.clientX, y: e.clientY };
+  } else if ((mode === 'circle' || mode === 'rect' || mode === 'triangle') && isPainting && shapeDragStart) {
+    shapeDragPreview = buildShape(mode, shapeDragStart, wp);
+  } else if (mode === 'select' && selDragType) {
+    applySelDrag(wp);
   }
 });
 
@@ -702,20 +916,67 @@ function endPaint() {
 
 canvas.addEventListener('mouseup', e => {
   if (e.button !== 0) return;
-  if (mouseDownScr) {
+
+  // Commit a drag-drawn shape
+  if ((mode === 'circle' || mode === 'rect' || mode === 'triangle') && isPainting) {
+    if (shapeDragPreview) { shapes.push(shapeDragPreview); updateStatus(); }
+    shapeDragStart = shapeDragPreview = null;
+  }
+
+  // End select drag
+  if (mode === 'select') selDragType = null;
+
+  // Click-to-select robot popup — only in draw/erase/pan modes, not place/shape/poly
+  if (mouseDownScr && (mode === 'draw' || mode === 'erase' || mode === 'pan')) {
     const dx = e.clientX - mouseDownScr.x, dy = e.clientY - mouseDownScr.y;
     if (dx * dx + dy * dy < 64) checkRobotClick(s2w(e.clientX, e.clientY));
   }
+
   mouseDownScr = null;
   endPaint();
 });
-canvas.addEventListener('mouseleave', endPaint);
+canvas.addEventListener('mouseleave', e => {
+  if (mode === 'circle' || mode === 'rect' || mode === 'triangle') {
+    if (isPainting && shapeDragPreview) { shapes.push(shapeDragPreview); updateStatus(); }
+    shapeDragStart = shapeDragPreview = null;
+  }
+  if (mode === 'select') selDragType = null;
+  mouseDownScr = null;
+  endPaint();
+});
 
-// Right-click → delete nearest robot
+// Poly: single click adds vertex; double-click finishes
+canvas.addEventListener('click', e => {
+  if (mode !== 'poly') return;
+  const now = Date.now();
+  const wp  = s2w(e.clientX, e.clientY);
+  if (now - polyLastMs < 350) { finishPoly(); return; } // double-click
+  polyLastMs = now;
+  addPolyPoint(wp);
+});
+canvas.addEventListener('dblclick', e => {
+  if (mode !== 'poly') return;
+  // dblclick fires after two clicks; finishPoly may have already run — guard with length check
+  if (polyPoints.length > 0) finishPoly();
+});
+
+// Right-click → delete robot OR selected/hit shape
 canvas.addEventListener('contextmenu', e => {
   e.preventDefault();
-  const wp  = s2w(e.clientX, e.clientY);
-  let minD  = 36, minI = -1;
+  const wp = s2w(e.clientX, e.clientY);
+  // Delete selected shape first
+  if (selectedShape && shapes.includes(selectedShape)) {
+    shapes.splice(shapes.indexOf(selectedShape), 1);
+    selectedShape = null; updateStatus(); return;
+  }
+  // Hit-test shapes
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    if (hitTestShape(wp, shapes[i], 10)) {
+      shapes.splice(i, 1); updateStatus(); return;
+    }
+  }
+  // Delete nearest robot
+  let minD = 36, minI = -1;
   robots.forEach((r, i) => {
     const d = Math.hypot(r.x - wp.x, r.y - wp.y);
     if (d < minD) { minD = d; minI = i; }
@@ -773,8 +1034,14 @@ canvas.addEventListener('touchstart', e => {
   } else if (mode === 'pan') {
     isPanning  = true;
     lastPanPos = { x: t.clientX, y: t.clientY };
+  } else if (mode === 'circle' || mode === 'rect' || mode === 'triangle') {
+    shapeDragStart = touchStartWp;
+    shapeDragPreview = null;
+    isPainting = true;
+  } else if (mode === 'select') {
+    startSelectDrag(touchStartWp);
   }
-  // 'place' mode: robot is placed on touchend (tap), not here
+  // 'place' and 'poly' modes handled on touchend tap
 
   // Long-press (600 ms, no move) → delete nearest robot
   touchLongTimer = setTimeout(() => {
@@ -826,6 +1093,10 @@ canvas.addEventListener('touchmove', e => {
     panX += t.clientX - lastPanPos.x;
     panY += t.clientY - lastPanPos.y;
     lastPanPos = { x: t.clientX, y: t.clientY };
+  } else if ((mode === 'circle' || mode === 'rect' || mode === 'triangle') && isPainting && shapeDragStart) {
+    shapeDragPreview = buildShape(mode, shapeDragStart, wp);
+  } else if (mode === 'select' && selDragType) {
+    applySelDrag(wp);
   }
 }, { passive: false });
 
@@ -833,14 +1104,29 @@ canvas.addEventListener('touchend', e => {
   e.preventDefault();
   cancelLongPress();
 
-  // Tap (no movement, single finger) → place robot or select robot
+  // Tap (no movement, single finger)
   if (!touchDidMove && !twoFinger && touchStartWp) {
-    if (mode === 'place') placeRobot(touchStartWp.x, touchStartWp.y);
-    else checkRobotClick(touchStartWp);
+    if (mode === 'place') {
+      placeRobot(touchStartWp.x, touchStartWp.y);
+    } else if (mode === 'poly') {
+      const now = Date.now();
+      if (now - polyLastMs < 350) { finishPoly(); }
+      else { polyLastMs = now; addPolyPoint(touchStartWp); }
+    } else if (mode === 'select') {
+      // handled by startSelectDrag on touchstart
+    } else if (mode === 'draw' || mode === 'erase' || mode === 'pan') {
+      checkRobotClick(touchStartWp);
+    }
   }
 
+  // Commit shape on finger lift
+  if (mode === 'circle' || mode === 'rect' || mode === 'triangle') {
+    if (isPainting && shapeDragPreview) { shapes.push(shapeDragPreview); updateStatus(); }
+    shapeDragStart = shapeDragPreview = null;
+  }
+  if (mode === 'select') selDragType = null;
+
   if (e.touches.length === 0) {
-    // All fingers lifted
     twoFinger = false;
     isPanning  = false;
     endPaint();
@@ -864,13 +1150,20 @@ canvas.addEventListener('touchcancel', e => {
 
 // Keyboard shortcuts
 window.addEventListener('keydown', e => {
-  if (e.target.closest('#code-panel')) return; // don't intercept editor
-  const k = e.key.toLowerCase();
+  if (e.target.closest('#code-panel')) return;
+  const k = e.key;
   if (k === 'd') setMode('draw');
   else if (k === 'e') setMode('erase');
   else if (k === 'p') setMode('place');
+  else if (k === 's') setMode('select');
   else if (k === ' ') { e.preventDefault(); setMode('pan'); }
   else if (k === 'c') toggleCodePanel();
+  else if (k === 'Escape') { cancelPoly(); selectedShape = null; selDragType = null; }
+  else if ((k === 'Delete' || k === 'Backspace') && selectedShape) {
+    e.preventDefault();
+    const i = shapes.indexOf(selectedShape);
+    if (i !== -1) { shapes.splice(i, 1); selectedShape = null; updateStatus(); }
+  }
 });
 window.addEventListener('keyup', e => {
   if (e.key === ' ' && mode === 'pan') setMode('draw');
@@ -917,6 +1210,196 @@ function placeRobot(wx, wy) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// Shape geometry helpers
+// ═══════════════════════════════════════════════════════════
+
+// Equilateral triangle vertices from centre + circumradius
+function triVerts(s) {
+  const a = -Math.PI / 2; // top vertex
+  return [0, 1, 2].map(i => ({
+    x: s.cx + s.r * Math.cos(a + i * Math.PI * 2 / 3),
+    y: s.cy + s.r * Math.sin(a + i * Math.PI * 2 / 3)
+  }));
+}
+
+// Build a preview shape from drag start → current cursor
+function buildShape(type, start, cur) {
+  const base = { width: lineWidth, filled: shapesFilled };
+  if (type === 'circle') {
+    return { ...base, type: 'circle',
+      cx: start.x, cy: start.y,
+      r: Math.max(4, Math.hypot(cur.x - start.x, cur.y - start.y)) };
+  }
+  if (type === 'rect') {
+    return { ...base, type: 'rect',
+      cx: (start.x + cur.x) / 2, cy: (start.y + cur.y) / 2,
+      rx: Math.max(4, Math.abs(cur.x - start.x) / 2),
+      ry: Math.max(4, Math.abs(cur.y - start.y) / 2) };
+  }
+  if (type === 'triangle') {
+    return { ...base, type: 'triangle',
+      cx: start.x, cy: start.y,
+      r: Math.max(8, Math.hypot(cur.x - start.x, cur.y - start.y)) };
+  }
+}
+
+// Polyline actions
+function addPolyPoint(wp) {
+  polyPoints.push({ x: wp.x, y: wp.y });
+  document.getElementById('poly-done-btn').style.display =
+    polyPoints.length >= 2 ? 'block' : 'none';
+}
+
+function finishPoly() {
+  if (polyPoints.length >= 2) {
+    shapes.push({ type: 'polyline', points: [...polyPoints], width: lineWidth });
+    updateStatus();
+  }
+  cancelPoly();
+}
+
+function cancelPoly() {
+  polyPoints = [];
+  polyLastMs = 0;
+  document.getElementById('poly-done-btn').style.display = 'none';
+}
+
+// Filled toggle
+function toggleFilled() {
+  shapesFilled = !shapesFilled;
+  document.getElementById('btn-filled').textContent = shapesFilled ? '◉ Filled' : '◯ Hollow';
+}
+
+// ── Select mode ───────────────────────────────────────────
+
+function getHandles(shape) {
+  switch (shape.type) {
+    case 'circle':
+      return [{ x: shape.cx + shape.r, y: shape.cy }];
+    case 'rect':
+      return [
+        { x: shape.cx - shape.rx, y: shape.cy - shape.ry },
+        { x: shape.cx + shape.rx, y: shape.cy - shape.ry },
+        { x: shape.cx + shape.rx, y: shape.cy + shape.ry },
+        { x: shape.cx - shape.rx, y: shape.cy + shape.ry },
+      ];
+    case 'triangle':
+      return triVerts(shape);
+    case 'polyline':
+      return shape.points.map(p => ({ x: p.x, y: p.y }));
+    default: return [];
+  }
+}
+
+function hitTestShape(wp, shape, margin = 6) {
+  const m = margin;
+  switch (shape.type) {
+    case 'circle': {
+      const d = Math.hypot(wp.x - shape.cx, wp.y - shape.cy);
+      if (shape.filled) return d <= shape.r + m;
+      return Math.abs(d - shape.r) <= shape.width / 2 + m;
+    }
+    case 'rect': {
+      const inX = Math.abs(wp.x - shape.cx) <= shape.rx + m;
+      const inY = Math.abs(wp.y - shape.cy) <= shape.ry + m;
+      if (shape.filled) return inX && inY;
+      const nearX = Math.abs(Math.abs(wp.x - shape.cx) - shape.rx) <= shape.width / 2 + m;
+      const nearY = Math.abs(Math.abs(wp.y - shape.cy) - shape.ry) <= shape.width / 2 + m;
+      return (nearX && inY) || (nearY && inX);
+    }
+    case 'triangle': {
+      if (shape.filled) return ptInTri(wp, ...triVerts(shape));
+      const v = triVerts(shape);
+      for (let i = 0; i < 3; i++) {
+        const a = v[i], b = v[(i + 1) % 3];
+        if (distToSeg(wp.x, wp.y, a.x, a.y, b.x, b.y) <= shape.width / 2 + m) return true;
+      }
+      return false;
+    }
+    case 'polyline': {
+      const thresh = shape.width / 2 + m;
+      for (let i = 0; i < shape.points.length - 1; i++) {
+        const a = shape.points[i], b = shape.points[i + 1];
+        if (distToSeg(wp.x, wp.y, a.x, a.y, b.x, b.y) <= thresh) return true;
+      }
+      return false;
+    }
+  }
+  return false;
+}
+
+function ptInTri(p, a, b, c) {
+  const d1 = (p.x - b.x) * (a.y - b.y) - (a.x - b.x) * (p.y - b.y);
+  const d2 = (p.x - c.x) * (b.y - c.y) - (b.x - c.x) * (p.y - c.y);
+  const d3 = (p.x - a.x) * (c.y - a.y) - (c.x - a.x) * (p.y - a.y);
+  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+}
+
+function deepCopyShape(s) {
+  return JSON.parse(JSON.stringify(s));
+}
+
+function startSelectDrag(wp) {
+  // 1. Check handles of currently selected shape
+  if (selectedShape) {
+    const handles = getHandles(selectedShape);
+    for (let i = 0; i < handles.length; i++) {
+      if (Math.hypot(wp.x - handles[i].x, wp.y - handles[i].y) < 10) {
+        selDragType = 'handle'; selDragHandleIdx = i;
+        selDragStart = wp; selDragSnap = deepCopyShape(selectedShape);
+        return;
+      }
+    }
+  }
+  // 2. Hit-test all shapes (top-most first)
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    if (hitTestShape(wp, shapes[i], 8)) {
+      selectedShape = shapes[i];
+      selDragType = 'body'; selDragHandleIdx = -1;
+      selDragStart = wp; selDragSnap = deepCopyShape(shapes[i]);
+      return;
+    }
+  }
+  // 3. Nothing hit — deselect
+  selectedShape = null; selDragType = null;
+}
+
+function applySelDrag(wp) {
+  if (!selectedShape || !selDragType) return;
+  const s = selectedShape, snap = selDragSnap;
+
+  if (selDragType === 'body') {
+    const dx = wp.x - selDragStart.x, dy = wp.y - selDragStart.y;
+    if (s.type === 'polyline') {
+      s.points = snap.points.map(p => ({ x: p.x + dx, y: p.y + dy }));
+    } else {
+      s.cx = snap.cx + dx; s.cy = snap.cy + dy;
+    }
+    return;
+  }
+
+  // Handle drag — resize
+  const i = selDragHandleIdx;
+  switch (s.type) {
+    case 'circle':
+      s.r = Math.max(4, Math.hypot(wp.x - s.cx, wp.y - s.cy));
+      break;
+    case 'rect': {
+      // Any corner → scale from centre symmetrically
+      s.rx = Math.max(4, Math.abs(wp.x - snap.cx));
+      s.ry = Math.max(4, Math.abs(wp.y - snap.cy));
+      break;
+    }
+    case 'triangle':
+      s.r = Math.max(8, Math.hypot(wp.x - s.cx, wp.y - s.cy));
+      break;
+    case 'polyline':
+      s.points[i] = { x: wp.x, y: wp.y };
+      break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // Sensor detection
 // ═══════════════════════════════════════════════════════════
 function distToSeg(px, py, ax, ay, bx, by) {
@@ -928,12 +1411,53 @@ function distToSeg(px, py, ax, ay, bx, by) {
 }
 
 function isOnLine(sx, sy) {
+  // Freehand strokes
   for (const line of lines) {
     const thresh = line.width / 2 + 1.5;
     const pts = line.points;
     for (let i = 0; i < pts.length - 1; i++) {
       if (distToSeg(sx, sy, pts[i].x, pts[i].y, pts[i+1].x, pts[i+1].y) <= thresh)
         return true;
+    }
+  }
+  // Parametric shapes
+  for (const shape of shapes) {
+    if (sensorOnShape(sx, sy, shape)) return true;
+  }
+  return false;
+}
+
+function sensorOnShape(sx, sy, shape) {
+  const t = shape.width / 2 + 1.5;
+  switch (shape.type) {
+    case 'polyline':
+      for (let i = 0; i < shape.points.length - 1; i++) {
+        const a = shape.points[i], b = shape.points[i + 1];
+        if (distToSeg(sx, sy, a.x, a.y, b.x, b.y) <= t) return true;
+      }
+      return false;
+    case 'circle': {
+      const d = Math.hypot(sx - shape.cx, sy - shape.cy);
+      return shape.filled ? d <= shape.r + t : Math.abs(d - shape.r) <= t;
+    }
+    case 'rect': {
+      if (shape.filled) {
+        return Math.abs(sx - shape.cx) <= shape.rx && Math.abs(sy - shape.cy) <= shape.ry;
+      }
+      const inX = Math.abs(sx - shape.cx) <= shape.rx + t;
+      const inY = Math.abs(sy - shape.cy) <= shape.ry + t;
+      const nearX = Math.abs(Math.abs(sx - shape.cx) - shape.rx) <= t;
+      const nearY = Math.abs(Math.abs(sy - shape.cy) - shape.ry) <= t;
+      return (nearX && inY) || (nearY && inX);
+    }
+    case 'triangle': {
+      const v = triVerts(shape);
+      if (shape.filled) return ptInTri({ x: sx, y: sy }, ...v);
+      for (let i = 0; i < 3; i++) {
+        const a = v[i], b = v[(i + 1) % 3];
+        if (distToSeg(sx, sy, a.x, a.y, b.x, b.y) <= t) return true;
+      }
+      return false;
     }
   }
   return false;
@@ -964,7 +1488,7 @@ function runTick() {
 
     const motor = [robot.motor[0], robot.motor[1]];
     try {
-      robotFn(robot.sensor.slice(), motor);
+      robotFn(robot.sensor.slice(), motor, window.debug);
       robotError = '';
     } catch (e) {
       robotError = e.message;
@@ -983,6 +1507,16 @@ function runTick() {
     robot.y     += v * Math.sin(robot.angle);
     robot.angle += omega;
   }
+
+  // Despawn robots that have wandered fully off the visible canvas
+  const margin = 80; // px beyond edge before despawn
+  robots = robots.filter(r => {
+    const sx = r.x + panX, sy = r.y + panY;
+    return sx > -margin && sx < canvas.width  + margin &&
+           sy > -margin && sy < canvas.height + margin;
+  });
+  // Deselect popup if its robot was removed
+  if (selectedRobot && !robots.includes(selectedRobot)) deselectRobot();
 
   document.getElementById('error-display').textContent = robotError;
 }
@@ -1028,9 +1562,24 @@ function render() {
   ctx.save();
   ctx.translate(panX, panY);
 
-  // Lines
+  // Freehand lines
   for (const line of lines) renderLine(line);
   if (currentLine && currentLine.points.length > 1) renderLine(currentLine);
+
+  // Parametric shapes
+  for (const shape of shapes) renderShape(shape);
+
+  // Shape drag-draw preview
+  if (shapeDragPreview) { ctx.globalAlpha = 0.6; renderShape(shapeDragPreview); ctx.globalAlpha = 1; }
+
+  // Poly-in-progress preview
+  if (polyPoints.length > 0) {
+    const cur = s2w(mouseScrPos.x, mouseScrPos.y);
+    renderPolyPreview(cur);
+  }
+
+  // Selection highlight + handles
+  if (selectedShape && shapes.includes(selectedShape)) renderSelection(selectedShape);
 
   // Robots
   for (const robot of robots) renderRobot(robot);
@@ -1057,6 +1606,7 @@ function render() {
   }
 
   updatePopup();
+  updateDebugBox();
 }
 
 // Subtle dot grid
@@ -1082,6 +1632,90 @@ function renderLine(line) {
   ctx.moveTo(line.points[0].x, line.points[0].y);
   for (let i = 1; i < line.points.length; i++) ctx.lineTo(line.points[i].x, line.points[i].y);
   ctx.stroke();
+}
+
+// ── Shape rendering ──────────────────────────────────────
+function shapeColor() { return isDark ? '#ffffff' : '#111111'; }
+
+function renderShape(shape) {
+  const col = shapeColor();
+  ctx.strokeStyle = col;
+  ctx.fillStyle   = col;
+  ctx.lineWidth   = shape.width;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  ctx.beginPath();
+  switch (shape.type) {
+    case 'polyline':
+      ctx.moveTo(shape.points[0].x, shape.points[0].y);
+      for (let i = 1; i < shape.points.length; i++) ctx.lineTo(shape.points[i].x, shape.points[i].y);
+      ctx.stroke(); return;
+    case 'circle':
+      ctx.arc(shape.cx, shape.cy, shape.r, 0, Math.PI * 2); break;
+    case 'rect':
+      ctx.rect(shape.cx - shape.rx, shape.cy - shape.ry, shape.rx * 2, shape.ry * 2); break;
+    case 'triangle': {
+      const v = triVerts(shape);
+      ctx.moveTo(v[0].x, v[0].y); ctx.lineTo(v[1].x, v[1].y);
+      ctx.lineTo(v[2].x, v[2].y); ctx.closePath(); break;
+    }
+  }
+  if (shape.filled) ctx.fill(); else ctx.stroke();
+}
+
+function renderPolyPreview(cur) {
+  const col = shapeColor();
+  ctx.strokeStyle = col; ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(polyPoints[0].x, polyPoints[0].y);
+  for (let i = 1; i < polyPoints.length; i++) ctx.lineTo(polyPoints[i].x, polyPoints[i].y);
+  ctx.lineTo(cur.x, cur.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // Dot on each committed vertex
+  ctx.fillStyle = col;
+  for (const p of polyPoints) {
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function renderSelection(shape) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(80, 180, 255, 0.85)';
+  ctx.lineWidth   = 2;
+  ctx.setLineDash([5, 4]);
+
+  ctx.beginPath();
+  switch (shape.type) {
+    case 'circle':
+      ctx.arc(shape.cx, shape.cy, shape.r + 8, 0, Math.PI * 2); break;
+    case 'rect':
+      ctx.rect(shape.cx - shape.rx - 7, shape.cy - shape.ry - 7,
+               (shape.rx + 7) * 2, (shape.ry + 7) * 2); break;
+    case 'triangle': {
+      const v = triVerts(shape);
+      ctx.moveTo(v[0].x, v[0].y); v.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+      ctx.closePath(); break;
+    }
+    case 'polyline':
+      ctx.moveTo(shape.points[0].x, shape.points[0].y);
+      shape.points.slice(1).forEach(p => ctx.lineTo(p.x, p.y)); break;
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Handles — white squares with blue border
+  getHandles(shape).forEach(h => {
+    ctx.fillStyle   = '#fff';
+    ctx.strokeStyle = '#4af';
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.rect(h.x - 5, h.y - 5, 10, 10);
+    ctx.fill(); ctx.stroke();
+  });
+  ctx.restore();
 }
 
 // ── Wheel colour helper ──────────────────────────────────
@@ -1233,7 +1867,8 @@ function compileCode() {
   const code = editor.getValue();
   localStorage.setItem(LS_KEY, code);
   try {
-    robotFn    = new Function('sensor', 'motor', code);
+    // debug is passed explicitly so it works even if window.debug is shadowed
+    robotFn    = new Function('sensor', 'motor', 'debug', code);
     robotError = '';
     document.getElementById('error-display').textContent = '';
   } catch (e) {
@@ -1288,7 +1923,10 @@ function toggleCodePanel() {
 
 function clearScene() {
   lines  = [];
+  shapes = [];
   robots = [];
+  cancelPoly();
+  selectedShape = null;
   deselectRobot();
   updateStatus();
 }
@@ -1345,7 +1983,100 @@ function clearCode() {
 function updateStatus() {
   const pausedTag = paused ? ' | ⏸ PAUSED' : '';
   document.getElementById('status').textContent =
-    `robots: ${robots.length} | line segments: ${lines.length}${pausedTag}`;
+    `robots: ${robots.length} | strokes: ${lines.length} | shapes: ${shapes.length}${pausedTag}`;
+}
+
+// ── Toolbar visibility ────────────────────────────────────
+function toggleToolbar() {
+  toolbarVisible = !toolbarVisible;
+  document.getElementById('toolbar').style.display    = toolbarVisible ? '' : 'none';
+  document.getElementById('btn-tb-toggle').style.display = toolbarVisible ? 'none' : '';
+}
+
+// ── Debug box ─────────────────────────────────────────────
+const debugBox = document.getElementById('debug-box');
+const debugBody = document.getElementById('debug-box-body');
+
+function toggleDebugBox() {
+  debugBoxOpen = !debugBoxOpen;
+  debugBox.style.display = debugBoxOpen ? 'block' : 'none';
+  document.getElementById('btn-debug').classList.toggle('active', debugBoxOpen);
+  if (debugBoxOpen) { debugDirty = true; updateDebugBox(); }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatVal(v) {
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(4).replace(/\.?0+$/, '');
+  if (v === null) return 'null';
+  if (v === undefined) return 'undefined';
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  if (typeof v === 'object') { try { return JSON.stringify(v); } catch { return String(v); } }
+  return String(v);
+}
+
+function updateDebugBox() {
+  if (!debugBoxOpen || !debugDirty) return;
+  debugDirty = false;
+  if (debugValues.size === 0) {
+    debugBody.innerHTML = '<div class="dbg-empty">No values — call debug(name, value) in robot code</div>';
+    return;
+  }
+  let html = '';
+  for (const [k, v] of debugValues) {
+    html += `<div class="dbg-row"><span class="dbg-key">${escHtml(k)}</span><span class="dbg-val">${escHtml(formatVal(v))}</span></div>`;
+  }
+  debugBody.innerHTML = html;
+}
+
+// ── Debug box drag ────────────────────────────────────────
+{
+  const hdr = document.getElementById('debug-box-header');
+  let dragging = false, ox = 0, oy = 0;
+
+  function startDebugDrag(cx, cy) {
+    dragging = true;
+    const r = debugBox.getBoundingClientRect();
+    // Anchor to left/top so right:auto works
+    debugBox.style.left   = r.left + 'px';
+    debugBox.style.top    = r.top  + 'px';
+    debugBox.style.right  = 'auto';
+    debugBox.style.bottom = 'auto';
+    ox = cx - r.left;
+    oy = cy - r.top;
+  }
+  function moveDebugDrag(cx, cy) {
+    if (!dragging) return;
+    // Keep within viewport
+    const w = debugBox.offsetWidth, h = debugBox.offsetHeight;
+    const x = Math.max(0, Math.min(window.innerWidth  - w, cx - ox));
+    const y = Math.max(0, Math.min(window.innerHeight - h, cy - oy));
+    debugBox.style.left = x + 'px';
+    debugBox.style.top  = y + 'px';
+  }
+
+  // Mouse
+  hdr.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    startDebugDrag(e.clientX, e.clientY);
+  });
+  window.addEventListener('mousemove', e => moveDebugDrag(e.clientX, e.clientY));
+  window.addEventListener('mouseup',   () => { dragging = false; });
+
+  // Touch
+  hdr.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    e.stopPropagation();
+    startDebugDrag(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  window.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    moveDebugDrag(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  window.addEventListener('touchend', () => { dragging = false; });
 }
 
 // ── Theme ─────────────────────────────────────────────────
