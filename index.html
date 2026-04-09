@@ -1844,8 +1844,8 @@ if (!anyLine) {
 } else {
   const base = 80;
   const kP   = 28;
-  motor[0] = base + kP * error;   // left  — turn right when error > 0
-  motor[1] = base - kP * error;   // right
+  motor[0] = base - kP * error;   // left  — turn right when error > 0
+  motor[1] = base + kP * error;   // right
 }`;
 
 const LS_KEY = 'linefollower_code';
